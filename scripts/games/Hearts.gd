@@ -20,11 +20,10 @@ const HandCardScene := preload("res://scenes/components/HandCard.tscn")
 @onready var message_label: Label = $MessageLabel
 
 @onready var slot_holder := {0: null, 1: null, 2: null, 3: null}
-@onready var slot_name_label := {0: null, 1: null, 2: null, 3: null}
 
-@onready var west_hand: HBoxContainer = $WestHand
+@onready var west_hand: VBoxContainer = $WestHand
 @onready var north_hand: HBoxContainer = $NorthHand
-@onready var east_hand: HBoxContainer = $EastHand
+@onready var east_hand: VBoxContainer = $EastHand
 
 @onready var pass_panel: VBoxContainer = $PassPanel
 @onready var pass_instruction_label: Label = $PassPanel/InstructionLabel
@@ -54,10 +53,10 @@ var current_turn: int = 0
 var round_points: Array = [0, 0, 0, 0]
 
 func _ready() -> void:
-	slot_holder[0] = $TrickArea/SlotYou/CardHolder
-	slot_holder[1] = $TrickArea/SlotWest/CardHolder
-	slot_holder[2] = $TrickArea/SlotNorth/CardHolder
-	slot_holder[3] = $TrickArea/SlotEast/CardHolder
+	slot_holder[0] = $TrickArea/SlotYou
+	slot_holder[1] = $TrickArea/SlotWest
+	slot_holder[2] = $TrickArea/SlotNorth
+	slot_holder[3] = $TrickArea/SlotEast
 
 	back_button.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/MainMenu.tscn"))
 	confirm_pass_button.pressed.connect(_on_confirm_pass)
@@ -400,7 +399,7 @@ func _render_hands(animate: bool) -> void:
 	_render_ai_hands()
 
 func _render_ai_hands() -> void:
-	# Render West hand (face-down cards)
+	# Render West hand (face-down cards, vertical on left)
 	for c in west_hand.get_children():
 		c.queue_free()
 	for i in range(hands[1].size()):
@@ -409,7 +408,7 @@ func _render_ai_hands() -> void:
 		cv.setup(null, false)  # face-down
 		cv.animate_in(i * 0.03)
 	
-	# Render North hand (face-down cards)
+	# Render North hand (face-down cards, horizontal on top)
 	for c in north_hand.get_children():
 		c.queue_free()
 	for i in range(hands[2].size()):
@@ -418,7 +417,7 @@ func _render_ai_hands() -> void:
 		cv.setup(null, false)  # face-down
 		cv.animate_in(i * 0.03)
 	
-	# Render East hand (face-down cards)
+	# Render East hand (face-down cards, vertical on right)
 	for c in east_hand.get_children():
 		c.queue_free()
 	for i in range(hands[3].size()):
