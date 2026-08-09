@@ -419,9 +419,8 @@ func _start_drag(pos: Vector2) -> void:
 		var idx: int = _press_src.get("idx", -1)
 		for c in children:
 			if c is Button and c.mouse_filter != Control.MOUSE_FILTER_IGNORE:
-				var rect: Rect2 = Rect2(c.position, CARD_SIZE)
-				var target_rect: Rect2 = _card_rect(col, idx)
-				if rect.has_point(target_rect.position):
+				var target_pos: Vector2 = _card_rect(col, idx).position
+				if c.position == target_pos:
 					c.visible = false
 					_hidden_originals.append(c)
 					idx += 1
