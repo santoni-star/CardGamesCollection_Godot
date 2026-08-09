@@ -9,7 +9,7 @@ extends Control
 @onready var quit_button: Button = $CenterContainer/VBoxContainer/QuitButton
 
 func _ready() -> void:
-	chips_label.text = "Chips: %d" % GameData.chips
+	chips_label.text = "Фішки: %d" % GameData.chips
 	kosynka_button.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/games/Kosynka/Kosynka.tscn"))
 	blackjack_button.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/games/Blackjack/Blackjack.tscn"))
 	hearts_button.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/games/Hearts/Hearts.tscn"))

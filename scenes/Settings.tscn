@@ -37,11 +37,11 @@ custom_minimum_size = Vector2(420, 0)
 layout_mode = 2
 theme_override_font_sizes/font_size = 32
 horizontal_alignment = 1
-text = "Settings"
+text = "Налаштування"
 
 [node name="SoundLabelHeader" type="Label" parent="CenterContainer/VBoxContainer"]
 layout_mode = 2
-text = "Sound Volume"
+text = "Гучність звуку"
 
 [node name="SoundSlider" type="HSlider" parent="CenterContainer/VBoxContainer"]
 layout_mode = 2
@@ -51,7 +51,7 @@ value = 0.8
 
 [node name="MusicLabelHeader" type="Label" parent="CenterContainer/VBoxContainer"]
 layout_mode = 2
-text = "Music Volume"
+text = "Гучність музики"
 
 [node name="MusicSlider" type="HSlider" parent="CenterContainer/VBoxContainer"]
 layout_mode = 2
@@ -61,14 +61,14 @@ value = 0.6
 
 [node name="NameLabelHeader" type="Label" parent="CenterContainer/VBoxContainer"]
 layout_mode = 2
-text = "Player Name"
+text = "Ім'я гравця"
 
 [node name="NameEdit" type="LineEdit" parent="CenterContainer/VBoxContainer"]
 layout_mode = 2
-text = "Player"
-placeholder_text = "Enter your name"
+text = "Гравець"
+placeholder_text = "Введіть ім'я"
 
 [node name="BackButton" type="Button" parent="CenterContainer/VBoxContainer"]
 layout_mode = 2
 custom_minimum_size = Vector2(300, 50)
-text = "Back to Menu"
+text = "Назад до меню"

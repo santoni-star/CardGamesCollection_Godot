@@ -36,13 +36,13 @@ theme_override_constants/separation = 18
 layout_mode = 2
 theme_override_font_sizes/font_size = 40
 horizontal_alignment = 1
-text = "Card Games Collection"
+text = "Карткові ігри"
 
 [node name="ChipsLabel" type="Label" parent="CenterContainer/VBoxContainer"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 20
 horizontal_alignment = 1
-text = "Chips: 1000"
+text = "Фішки: 1000"
 
 [node name="Spacer" type="Control" parent="CenterContainer/VBoxContainer"]
 custom_minimum_size = Vector2(0, 10)
@@ -58,28 +58,28 @@ text = "Косинка (Пасьянс)"
 layout_mode = 2
 custom_minimum_size = Vector2(320, 60)
 theme_override_font_sizes/font_size = 20
-text = "Blackjack (21)"
+text = "Блекджек (21)"
 
 [node name="HeartsButton" type="Button" parent="CenterContainer/VBoxContainer"]
 layout_mode = 2
 custom_minimum_size = Vector2(320, 60)
 theme_override_font_sizes/font_size = 20
-text = "Hearts"
+text = "Чирви (Hearts)"
 
 [node name="ThousandButton" type="Button" parent="CenterContainer/VBoxContainer"]
 layout_mode = 2
 custom_minimum_size = Vector2(320, 60)
 theme_override_font_sizes/font_size = 20
-text = "Thousand (1000)"
+text = "Тисяча (1000)"
 
 [node name="SettingsButton" type="Button" parent="CenterContainer/VBoxContainer"]
 layout_mode = 2
 custom_minimum_size = Vector2(320, 60)
 theme_override_font_sizes/font_size = 20
-text = "Settings"
+text = "Налаштування"
 
 [node name="QuitButton" type="Button" parent="CenterContainer/VBoxContainer"]
 layout_mode = 2
 custom_minimum_size = Vector2(320, 60)
 theme_override_font_sizes/font_size = 20
-text = "Quit"
+text = "Вийти"
