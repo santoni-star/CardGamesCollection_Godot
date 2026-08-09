@@ -275,6 +275,13 @@ func _advance_play() -> void:
 	if hands[0].is_empty() and hands[1].is_empty() and hands[2].is_empty():
 		_end_round()
 		return
+	# Skip a player who already played in this trick (race between the
+	# play-chain and the resolve-chain when the human clicks during the
+	# 0.9s resolve pause).
+	if trick_cards[current_turn] != null:
+		current_turn = (current_turn + 1) % 3
+		_advance_play()
+		return
 	if current_turn == 0:
 		status_label.text = "Ваш хід"
 		_update_hand_interactivity()
@@ -301,6 +308,10 @@ func _try_play_human_card(card: Card, hand_card_node: Control) -> void:
 	_play_card(0, card)
 
 func _play_card(player: int, card: Card) -> void:
+	# Race guard: a player may be asked to move twice when the resolve-chain
+	# and the play-chain overlap (fast human click during the resolve pause).
+	if trick_cards[player] != null:
+		return
 	var is_lead := true
 	for c in trick_cards:
 		if c != null:

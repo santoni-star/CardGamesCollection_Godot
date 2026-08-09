@@ -42,10 +42,10 @@ const AI_STRIP := 30.0  # visible strip of each fanned card
 @onready var continue_button: Button = $ContinueButton
 @onready var player_hand_row: HBoxContainer = $PlayerHandRow
 
-var PLAYER_NAMES := ["Player", "West", "North", "East"]
+var PLAYER_NAMES := ["Ви", "Захід", "Північ", "Схід"]
 # Pass direction per round (round_number % 4): left, right, across, hold.
 const PASS_OFFSETS := [1, 3, 2, 0]
-const PASS_NAMES := ["left", "right", "across", "hold your cards"]
+const PASS_NAMES := ["ліворуч", "праворуч", "навпроти", "залишити собі"]
 const PASS_ARROWS := ["←", "→", "↑", ""]
 
 var hands: Array = [[], [], [], []]
@@ -109,7 +109,7 @@ func start_new_round() -> void:
 	var offset: int = PASS_OFFSETS[round_number % 4]
 	if offset == 0:
 		phase = Phase.PLAYING
-		message_label.text = "This round: hold your cards."
+		message_label.text = "Цей раунд: залиште карти собі."
 		_render_hands(true)
 		_begin_first_trick()
 	else:
@@ -118,7 +118,7 @@ func start_new_round() -> void:
 		pass_arrow_button.text = PASS_ARROWS[round_number % 4]
 		pass_arrow_button.disabled = true
 		pass_arrow_button.visible = true
-		status_label.text = "Select 3 cards"
+		status_label.text = "Виберіть 3 карти"
 		_render_hands(true)
 
 func _on_confirm_pass() -> void:
@@ -139,7 +139,7 @@ func _on_confirm_pass() -> void:
 
 	pass_arrow_button.visible = false
 	phase = Phase.PLAYING
-	message_label.text = "Cards passed %s." % PASS_NAMES[round_number % 4]
+	message_label.text = "Карти передано %s." % PASS_NAMES[round_number % 4]
 	_render_hands(true)
 	_render_ai_hands()
 	_begin_first_trick()
@@ -166,26 +166,48 @@ func _find_two_of_clubs_holder() -> int:
 # ---------------------------------------------------------------------------
 
 func _advance_play() -> void:
+	# All cards played — round is over. Checked BEFORE any AI move so the
+	# leader of a phantom "14th trick" can never crash on an empty hand.
+	if hands[0].is_empty() and hands[1].is_empty() and hands[2].is_empty() and hands[3].is_empty():
+		_end_round()
+		return
+	# Skip a player who already played in this trick (race between the
+	# play-chain and the resolve-chain when the human clicks during the
+	# 0.55s resolve pause).
+	if trick_cards[current_turn] != null:
+		current_turn = (current_turn + 1) % 4
+		_advance_play()
+		return
 	if current_turn == 0:
-		status_label.text = "Your turn"
+		status_label.text = "Ваш хід"
 		_update_hand_interactivity()
 	else:
-		status_label.text = "%s is playing..." % PLAYER_NAMES[current_turn]
+		status_label.text = "%s ходить..." % PLAYER_NAMES[current_turn]
 		await get_tree().create_timer(0.6).timeout
-		var card = _ai_choose_card(current_turn)
+		var card: Card = _ai_choose_card(current_turn)
+		if card == null:
+			_end_round()
+			return
 		_play_card(current_turn, card)
 
 func _try_play_human_card(card: Card, hand_card_node: Control) -> void:
 	if phase != Phase.PLAYING or current_turn != 0:
 		return
+	# Guard: player already played this trick (fast double-click during resolve pause).
+	if trick_cards[0] != null:
+		return
 	var legal: Array = _legal_cards(0)
 	if not legal.has(card):
-		message_label.text = "You must follow suit!"
+		message_label.text = "Потрібно ходити в масть!"
 		hand_card_node.animate_reject()
 		return
 	_play_card(0, card)
 
 func _play_card(player: int, card: Card) -> void:
+	# Race guard: a player may be asked to move twice when the resolve-chain
+	# and the play-chain overlap (fast human click during the resolve pause).
+	if trick_cards[player] != null:
+		return
 	var idx: int = hands[player].find(card)
 	hands[player].erase(card)
 	if card.suit == Card.Suit.HEARTS:
@@ -223,6 +245,9 @@ func _play_card(player: int, card: Card) -> void:
 		_advance_play()
 
 func _resolve_trick() -> void:
+	# Idempotency guard: a stray double-call must not crash on a cleared trick.
+	if trick_cards[0] == null or trick_cards[1] == null or trick_cards[2] == null or trick_cards[3] == null:
+		return
 	var led_suit: int = trick_cards[trick_leader].suit
 	var best_player := trick_leader
 	var best_score := _card_score(trick_cards[trick_leader], led_suit)
@@ -243,9 +268,9 @@ func _resolve_trick() -> void:
 	round_points[best_player] += points
 
 	if points > 0:
-		message_label.text = "%s takes the trick (+%d points)" % [PLAYER_NAMES[best_player], points]
+		message_label.text = "%s забирає взятку (+%d очок)" % [PLAYER_NAMES[best_player], points]
 	else:
-		message_label.text = "%s takes the trick" % PLAYER_NAMES[best_player]
+		message_label.text = "%s забирає взятку" % PLAYER_NAMES[best_player]
 
 	var winner_holder: Control = slot_holder[best_player]
 	for p in 4:
@@ -312,6 +337,8 @@ func _legal_cards(player: int) -> Array:
 
 func _ai_choose_card(player: int) -> Card:
 	var legal: Array = _legal_cards(player)
+	if legal.is_empty():
+		return null
 	var is_lead: bool = trick_cards[trick_leader] == null
 
 	if is_lead:
@@ -359,7 +386,7 @@ func _end_round() -> void:
 	if moon_shooter != -1:
 		for p in 4:
 			total_score[p] += 0 if p == moon_shooter else 26
-		result_lines.append("%s shot the moon! Everyone else +26." % PLAYER_NAMES[moon_shooter])
+		result_lines.append("%s зібрав місяць! Решта отримує +26." % PLAYER_NAMES[moon_shooter])
 	else:
 		for p in 4:
 			total_score[p] += round_points[p]
@@ -380,11 +407,11 @@ func _end_round() -> void:
 		for p in 4:
 			if total_score[p] < total_score[best_p]:
 				best_p = p
-		status_label.text = "%s wins with the lowest score (%d)!" % [PLAYER_NAMES[best_p], total_score[best_p]]
-		continue_button.text = "New Match"
+		status_label.text = "%s перемагає з найменшим рахунком (%d)!" % [PLAYER_NAMES[best_p], total_score[best_p]]
+		continue_button.text = "Новий матч"
 	else:
-		status_label.text = "Round over"
-		continue_button.text = "Next Round"
+		status_label.text = "Раунд завершено"
+		continue_button.text = "Наступний раунд"
 	continue_button.visible = true
 
 func _on_continue_pressed() -> void:

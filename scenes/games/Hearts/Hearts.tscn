@@ -44,7 +44,7 @@ offset_top = 692.0
 offset_right = 400.0
 offset_bottom = 714.0
 theme_override_font_sizes/font_size = 14
-text = "You: 0  West: 0  North: 0  East: 0"
+text = "Ви: 0  Захід: 0  Північ: 0  Схід: 0"
 
 [node name="WestSide" type="VBoxContainer" parent="."]
 layout_mode = 1
@@ -63,7 +63,7 @@ visible = true
 layout_mode = 2
 theme_override_font_sizes/font_size = 20
 horizontal_alignment = 1
-text = "West"
+text = "Захід"
 
 [node name="WestHand" type="VBoxContainer" parent="WestSide"]
 layout_mode = 2
@@ -99,7 +99,7 @@ offset_right = 60.0
 offset_bottom = 28.0
 theme_override_font_sizes/font_size = 20
 horizontal_alignment = 1
-text = "North"
+text = "Північ"
 
 [node name="EastSide" type="VBoxContainer" parent="."]
 layout_mode = 1
@@ -120,7 +120,7 @@ visible = true
 layout_mode = 2
 theme_override_font_sizes/font_size = 20
 horizontal_alignment = 1
-text = "East"
+text = "Схід"
 
 [node name="EastHand" type="VBoxContainer" parent="EastSide"]
 layout_mode = 2
@@ -136,7 +136,7 @@ offset_right = 690.0
 offset_bottom = 584.0
 theme_override_font_sizes/font_size = 20
 horizontal_alignment = 1
-text = "Player"
+text = "Ви"
 
 [node name="TrickArea" type="Control" parent="."]
 layout_mode = 1
@@ -252,7 +252,7 @@ anchor_bottom = 0.63
 grow_horizontal = 2
 grow_vertical = 2
 custom_minimum_size = Vector2(220, 50)
-text = "Next Round"
+text = "Наступний раунд"
 
 [node name="StatusLabel" type="Label" parent="."]
 layout_mode = 1
