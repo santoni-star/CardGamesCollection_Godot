@@ -207,18 +207,12 @@ func _render_all() -> void:
 		var back := _make_card_btn(null, false)
 		back.position = STOCK_POS
 		back.mouse_filter = Control.MOUSE_FILTER_STOP
-		back.button_down.connect(_on_stock_pressed)
 		board.add_child(back)
 
-	# Waste: fanned face-up cards; only the top one is interactive.
+	# Waste: fanned face-up cards; visual only (input goes through _input).
 	for i in waste.size():
 		var cv := _make_card_btn(waste[i], true)
 		cv.position = WASTE_POS + Vector2(min(i * WASTE_FAN, 40.0), 0)
-		if i == waste.size() - 1:
-			cv.button_down.connect(_on_card_down.bind({"type": "waste"}))
-			cv.button_up.connect(_on_card_up)
-		else:
-			cv.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		board.add_child(cv)
 
 	# Foundations: slot + cards (cards are not interactive here).
@@ -232,7 +226,7 @@ func _render_all() -> void:
 			cv.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			board.add_child(cv)
 
-	# Tableau: face-down cards below face-up runs.
+	# Tableau: face-down cards below face-up runs (visual only).
 	for col in 7:
 		var slot := _make_slot_btn()
 		slot.position = Vector2(TAB_X[col], TAB_Y)
@@ -242,9 +236,6 @@ func _render_all() -> void:
 			var face_up: bool = _is_face_up(col, i)
 			var cv := _make_card_btn(tableau[col][i], face_up)
 			cv.position = Vector2(TAB_X[col], y)
-			if face_up:
-				cv.button_down.connect(_on_card_down.bind({"type": "tableau", "col": col, "idx": i}))
-				cv.button_up.connect(_on_card_up)
 			board.add_child(cv)
 			y += TAB_UP_STEP if face_up else TAB_DOWN_STEP
 
@@ -299,17 +290,78 @@ func _make_card_btn(card: Card, face_up: bool) -> Button:
 	return b
 
 # ---------------------------------------------------------------------------
-# INPUT — drag & drop via Button signals + _unhandled_input motion
+# INPUT — _input on the root sees every event BEFORE the GUI consumes it.
+# Buttons (mouse_filter=STOP) eat mouse-motion inside their rect, so
+# _unhandled_input can never see a drag; _input runs before GUI dispatch.
 # ---------------------------------------------------------------------------
 
-func _unhandled_input(event: InputEvent) -> void:
-	# Mouse motion while a card is pressed: once past the threshold, start the
-	# drag and follow the cursor with ghost copies.
-	if event is InputEventMouseMotion and _press_src.size() > 0:
-		if not _drag_active and event.position.distance_to(_press_pos) > DRAG_THRESHOLD:
-			_start_drag(event.position)
-		elif _drag_active:
-			_move_ghosts(event.position)
+func _input(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		if event.pressed:
+			_handle_press(event.position)
+		else:
+			_handle_release(event.position)
+	elif event is InputEventMouseMotion:
+		if _press_src.size() > 0:
+			if not _drag_active and event.position.distance_to(_press_pos) > DRAG_THRESHOLD:
+				_start_drag(event.position)
+			elif _drag_active:
+				_move_ghosts(event.position)
+
+## Press hit-test: stock click draws; a card press starts a potential drag.
+func _handle_press(pos: Vector2) -> void:
+	if game_over:
+		return
+	# Stock: click draws a card.
+	if not stock.is_empty() and Rect2(STOCK_POS, CARD_SIZE).has_point(pos):
+		_draw_from_stock()
+		return
+	# Waste top card.
+	if not waste.is_empty():
+		var top_pos := WASTE_POS + Vector2(min((waste.size() - 1) * WASTE_FAN, 40.0), 0)
+		if Rect2(top_pos, CARD_SIZE).has_point(pos):
+			_press_src = {"type": "waste"}
+			_press_pos = pos
+			_drag_active = false
+			return
+	# Tableau face-up cards, topmost first.
+	for col in 7:
+		for i in range(tableau[col].size() - 1, -1, -1):
+			if _is_face_up(col, i) and _card_rect(col, i).has_point(pos):
+				_press_src = {"type": "tableau", "col": col, "idx": i}
+				_press_pos = pos
+				_drag_active = false
+				return
+
+## Release: plain click auto-sends to foundation; drag drops by hit-test.
+func _handle_release(pos: Vector2) -> void:
+	if _press_src.size() == 0:
+		return
+	var src: Dictionary = _press_src
+	_press_src = {}
+
+	if not _drag_active:
+		_try_click_to_foundation(src)
+		return
+
+	_clear_ghosts()
+	_drag_active = false
+	var cards: Array = _dragged_cards_from(src)
+	if cards.is_empty():
+		return
+
+	# Drop hit-test: foundations first, then columns.
+	for f in 4:
+		var r := Rect2(Vector2(FOUND_X[f], FOUND_Y), CARD_SIZE)
+		if r.has_point(pos):
+			_finish_drop_to_foundation(f, cards)
+			return
+	for col in 7:
+		if _column_rect(col).has_point(pos):
+			_finish_drop_to_tableau(col, cards, src)
+			return
+
+# -- Direct handlers used by headless tests (bypass GUI dispatch) ------------
 
 func _on_stock_pressed() -> void:
 	_draw_from_stock()
@@ -327,33 +379,7 @@ func _on_card_down(src: Dictionary) -> void:
 	_drag_active = false
 
 func _on_card_up() -> void:
-	if _press_src.size() == 0:
-		return
-	var release_pos: Vector2 = get_viewport().get_mouse_position()
-	var src: Dictionary = _press_src
-	_press_src = {}
-
-	if not _drag_active:
-		# Plain click: auto-send a top card (waste or tableau top) to a foundation.
-		_try_click_to_foundation(src)
-		return
-
-	_clear_ghosts()
-	_drag_active = false
-	var cards: Array = _dragged_cards_from(src)
-	if cards.is_empty():
-		return
-
-	# Drop hit-test: foundations first, then columns.
-	for f in 4:
-		var r := Rect2(Vector2(FOUND_X[f], FOUND_Y), CARD_SIZE)
-		if r.has_point(release_pos):
-			_finish_drop_to_foundation(f, cards)
-			return
-	for col in 7:
-		if _column_rect(col).has_point(release_pos):
-			_finish_drop_to_tableau(col, cards, src)
-			return
+	_handle_release(get_viewport().get_mouse_position())
 
 func _dragged_cards_from(src: Dictionary) -> Array:
 	var cards: Array = []
