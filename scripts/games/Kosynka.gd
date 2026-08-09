@@ -199,13 +199,14 @@ func _render_all() -> void:
 	_clear_board()
 	_ghosts.clear()
 
-	# Stock slot + pile.
+	# Stock slot + pile. The stock pile is interactive: click draws a card.
 	var stock_slot := _make_slot_btn()
 	stock_slot.position = STOCK_POS
 	board.add_child(stock_slot)
 	if not stock.is_empty():
 		var back := _make_card_btn(null, false)
 		back.position = STOCK_POS
+		back.mouse_filter = Control.MOUSE_FILTER_STOP
 		back.button_down.connect(_on_stock_pressed)
 		board.add_child(back)
 
@@ -216,6 +217,8 @@ func _render_all() -> void:
 		if i == waste.size() - 1:
 			cv.button_down.connect(_on_card_down.bind({"type": "waste"}))
 			cv.button_up.connect(_on_card_up)
+		else:
+			cv.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		board.add_child(cv)
 
 	# Foundations: slot + cards (cards are not interactive here).
@@ -226,6 +229,7 @@ func _render_all() -> void:
 		if not foundations[f].is_empty():
 			var cv := _make_card_btn(foundations[f][foundations[f].size() - 1], true)
 			cv.position = Vector2(FOUND_X[f], FOUND_Y)
+			cv.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			board.add_child(cv)
 
 	# Tableau: face-down cards below face-up runs.
