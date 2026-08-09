@@ -40,7 +40,7 @@ func _ready() -> void:
 	_set_action_buttons(false)
 
 func update_chips_label() -> void:
-	chips_label.text = "Chips: %d" % GameData.chips
+	chips_label.text = "Фішки: %d" % GameData.chips
 
 func _set_action_buttons(enabled: bool) -> void:
 	hit_button.disabled = not enabled
@@ -74,7 +74,7 @@ func _add_player_card(card: Card, delay: float = 0.0) -> void:
 func _on_deal_pressed() -> void:
 	current_bet = int(bet_spinbox.value)
 	if current_bet > GameData.chips:
-		message_label.text = "Not enough chips!"
+		message_label.text = "Недостатньо фішок!"
 		CardFX.shake(message_label)
 		return
 
@@ -104,11 +104,11 @@ func _on_deal_pressed() -> void:
 		_finish_round()
 
 func _update_labels(reveal_dealer: bool) -> void:
-	player_label.text = "You: %d" % _hand_value(player_hand)
+	player_label.text = "Ви: %d" % _hand_value(player_hand)
 	if reveal_dealer:
-		dealer_label.text = "Dealer: %d" % _hand_value(dealer_hand)
+		dealer_label.text = "Дилер: %d" % _hand_value(dealer_hand)
 	else:
-		dealer_label.text = "Dealer: %d + ?" % dealer_hand[0].blackjack_value()
+		dealer_label.text = "Дилер: %d + ?" % dealer_hand[0].blackjack_value()
 
 func _hand_value(hand: Array[Card]) -> int:
 	var total := 0
@@ -173,22 +173,22 @@ func _finish_round() -> void:
 
 	if player_total > 21:
 		GameData.chips -= current_bet
-		result_text = "Bust! You lose %d chips." % current_bet
+		result_text = "Перебір! Ви втрачаєте %d фішок." % current_bet
 	elif player_total == 21 and player_hand.size() == 2:
 		var win := int(current_bet * 1.5)
 		GameData.chips += win
-		result_text = "Blackjack! You win %d chips!" % win
+		result_text = "Блекджек! Ви виграєте %d фішок!" % win
 	elif dealer_total > 21:
 		GameData.chips += current_bet
-		result_text = "Dealer busts! You win %d chips!" % current_bet
+		result_text = "Дилер перебрав! Ви виграєте %d фішок!" % current_bet
 	elif player_total > dealer_total:
 		GameData.chips += current_bet
-		result_text = "You win %d chips!" % current_bet
+		result_text = "Ви виграєте %d фішок!" % current_bet
 	elif player_total < dealer_total:
 		GameData.chips -= current_bet
-		result_text = "You lose %d chips." % current_bet
+		result_text = "Ви втрачаєте %d фішок." % current_bet
 	else:
-		result_text = "Push. Bet returned."
+		result_text = "Нічия. Ставка повертається."
 
 	message_label.text = result_text
 	CardFX.pulse(message_label)

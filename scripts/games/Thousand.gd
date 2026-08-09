@@ -42,7 +42,7 @@ const HandCardScene := preload("res://scenes/components/HandCard.tscn")
 @onready var continue_button: Button = $ContinueButton
 @onready var player_hand_row: HBoxContainer = $PlayerHandRow
 
-const PLAYER_NAMES := ["You", "AI West", "AI East"]
+const PLAYER_NAMES := ["Ви", "ІІ Захід", "ІІ Схід"]
 
 var hands: Array = [[], [], []]
 var widow: Array = []
@@ -142,7 +142,7 @@ func _advance_bidding() -> void:
 			_show_bidding_panel_for_human()
 			return
 		else:
-			status_label.text = "%s is thinking..." % PLAYER_NAMES[current_bid_turn]
+			status_label.text = "%s розмірковує..." % PLAYER_NAMES[current_bid_turn]
 			await get_tree().create_timer(0.7).timeout
 			_ai_make_bid_decision(current_bid_turn)
 			current_bid_turn = (current_bid_turn + 1) % 3
@@ -151,11 +151,11 @@ func _advance_bidding() -> void:
 
 func _show_bidding_panel_for_human() -> void:
 	bidding_panel.visible = true
-	var txt := "Current bid: %d" % highest_bid
+	var txt := "Поточна ставка: %d" % highest_bid
 	if highest_bidder != -1:
 		txt += " (%s)" % PLAYER_NAMES[highest_bidder]
 	current_bid_label.text = txt
-	status_label.text = "Your turn to bid"
+	status_label.text = "Ваша черга торгуватись"
 
 func _human_bid(increment: int) -> void:
 	var new_bid: int
@@ -165,14 +165,14 @@ func _human_bid(increment: int) -> void:
 		new_bid = highest_bid + increment
 	highest_bid = new_bid
 	highest_bidder = 0
-	message_label.text = "You bid %d" % new_bid
+	message_label.text = "Ви ставите %d" % new_bid
 	bidding_panel.visible = false
 	current_bid_turn = (current_bid_turn + 1) % 3
 	_advance_bidding()
 
 func _on_human_pass() -> void:
 	passed[0] = true
-	message_label.text = "You pass"
+	message_label.text = "Ви пасуєте"
 	bidding_panel.visible = false
 	current_bid_turn = (current_bid_turn + 1) % 3
 	_advance_bidding()
@@ -186,10 +186,10 @@ func _ai_make_bid_decision(p: int) -> void:
 			new_bid += 5
 		highest_bid = new_bid
 		highest_bidder = p
-		message_label.text = "%s bids %d" % [PLAYER_NAMES[p], new_bid]
+		message_label.text = "%s ставить %d" % [PLAYER_NAMES[p], new_bid]
 	else:
 		passed[p] = true
-		message_label.text = "%s passes" % PLAYER_NAMES[p]
+		message_label.text = "%s пасує" % PLAYER_NAMES[p]
 	_render_status()
 
 func _hand_strength(hand: Array) -> int:
@@ -232,9 +232,9 @@ func _start_discard_phase() -> void:
 		discard_panel.visible = true
 		selected_discards.clear()
 		confirm_discard_button.disabled = true
-		status_label.text = "Choose 3 cards to discard"
+		status_label.text = "Виберіть 3 карти для скидання"
 	else:
-		status_label.text = "%s is discarding..." % PLAYER_NAMES[highest_bidder]
+		status_label.text = "%s скидає..." % PLAYER_NAMES[highest_bidder]
 		await get_tree().create_timer(0.9).timeout
 		_ai_discard(highest_bidder)
 		_start_playing_phase()
@@ -263,27 +263,39 @@ func _start_playing_phase() -> void:
 	current_turn = trick_leader
 	trick_cards = [null, null, null]
 	_clear_trick_area()
-	message_label.text = "Bidding done. %s leads." % PLAYER_NAMES[trick_leader]
+	message_label.text = "Торги завершено. %s ходить першим." % PLAYER_NAMES[trick_leader]
 	_render_hands(true)
-	status_label.text = "Playing — contract %d" % highest_bid
+	status_label.text = "Гра — контракт %d" % highest_bid
 	_advance_play()
 
 func _advance_play() -> void:
+	# All cards played — the round is over. This must be checked BEFORE any
+	# AI move, otherwise the leader of the "8th trick" would crash on an
+	# empty hand (legal[0] on empty array).
+	if hands[0].is_empty() and hands[1].is_empty() and hands[2].is_empty():
+		_end_round()
+		return
 	if current_turn == 0:
-		status_label.text = "Your turn"
+		status_label.text = "Ваш хід"
 		_update_hand_interactivity()
 	else:
-		status_label.text = "%s is playing..." % PLAYER_NAMES[current_turn]
+		status_label.text = "%s ходить..." % PLAYER_NAMES[current_turn]
 		await get_tree().create_timer(0.7).timeout
-		var card = _ai_choose_card(current_turn)
+		var card: Card = _ai_choose_card(current_turn)
+		if card == null:
+			_end_round()
+			return
 		_play_card(current_turn, card)
 
 func _try_play_human_card(card: Card, hand_card_node: Control) -> void:
 	if phase != Phase.PLAYING or current_turn != 0:
 		return
+	# Guard: player already played this trick (fast double-click during resolve pause).
+	if trick_cards[0] != null:
+		return
 	var legal: Array = _legal_cards(0)
 	if not legal.has(card):
-		message_label.text = "You must follow suit!"
+		message_label.text = "Потрібно ходити в масть!"
 		hand_card_node.animate_reject()
 		return
 	_play_card(0, card)
@@ -309,7 +321,7 @@ func _play_card(player: int, card: Card) -> void:
 			marriage_points[player] += mv
 			if trump_suit == -1:
 				trump_suit = card.suit
-			message_label.text = "%s announces a marriage in %s! (+%d)" % [PLAYER_NAMES[player], _suit_name(card.suit), mv]
+			message_label.text = "%s оголошує шлюб у %s! (+%d)" % [PLAYER_NAMES[player], _suit_name(card.suit), mv]
 			CardFX.pulse(message_label)
 
 	trick_cards[player] = card
@@ -317,8 +329,8 @@ func _play_card(player: int, card: Card) -> void:
 	if player == 0:
 		_render_hands(false)
 	else:
-		ai_west_label.text = "AI West — %d cards" % hands[1].size()
-		ai_east_label.text = "AI East — %d cards" % hands[2].size()
+		ai_west_label.text = "ІІ Захід — %d карт" % hands[1].size()
+		ai_east_label.text = "ІІ Схід — %d карт" % hands[2].size()
 
 	var all_played := true
 	for c in trick_cards:
@@ -334,6 +346,10 @@ func _play_card(player: int, card: Card) -> void:
 		_advance_play()
 
 func _resolve_trick() -> void:
+	# Idempotency guard: a stray double-call (fast player clicks during the
+	# 0.9s resolve pause) must not crash on an already-cleared trick.
+	if trick_cards[0] == null or trick_cards[1] == null or trick_cards[2] == null:
+		return
 	var led_suit: int = trick_cards[trick_leader].suit
 	var best_player := trick_leader
 	var best_score := _card_score(trick_cards[trick_leader], led_suit)
@@ -349,7 +365,7 @@ func _resolve_trick() -> void:
 	for c in trick_cards:
 		trick_points += c.thousand_points()
 	tricks_won_points[best_player] += trick_points
-	message_label.text = "%s wins the trick (+%d points)" % [PLAYER_NAMES[best_player], trick_points]
+	message_label.text = "%s виграє взятку (+%d очок)" % [PLAYER_NAMES[best_player], trick_points]
 
 	# Sweep the played cards toward the winner's slot, then free them.
 	var winner_holder: Control = slot_holder[best_player]
@@ -393,6 +409,8 @@ func _legal_cards(player: int) -> Array:
 
 func _ai_choose_card(player: int) -> Card:
 	var legal: Array = _legal_cards(player)
+	if legal.is_empty():
+		return null
 	var is_lead: bool = trick_cards[trick_leader] == null
 
 	if is_lead:
@@ -436,17 +454,17 @@ func _end_round() -> void:
 	var result_lines := []
 
 	if bidder_total >= highest_bid:
-		total_score[highest_bidder] += highest_bid
-		result_lines.append("%s made the bid (%d/%d)! +%d" % [PLAYER_NAMES[highest_bidder], bidder_total, highest_bid, highest_bid])
+		total_score[highest_bidder] += bidder_total
+		result_lines.append("%s виконав контракт (%d/%d)! +%d" % [PLAYER_NAMES[highest_bidder], bidder_total, highest_bid, bidder_total])
 	else:
 		total_score[highest_bidder] -= highest_bid
-		result_lines.append("%s failed the bid (%d/%d)! -%d" % [PLAYER_NAMES[highest_bidder], bidder_total, highest_bid, highest_bid])
+		result_lines.append("%s провалив контракт (%d/%d)! -%d" % [PLAYER_NAMES[highest_bidder], bidder_total, highest_bid, highest_bid])
 
 	for p in 3:
 		if p != highest_bidder:
 			var pts: int = tricks_won_points[p] + marriage_points[p]
 			total_score[p] += pts
-			result_lines.append("%s scored %d points" % [PLAYER_NAMES[p], pts])
+			result_lines.append("%s набрав %d очок" % [PLAYER_NAMES[p], pts])
 
 	message_label.text = "\n".join(result_lines)
 	CardFX.pulse(score_label)
@@ -459,11 +477,11 @@ func _end_round() -> void:
 
 	if winner != -1:
 		phase = Phase.GAME_OVER
-		status_label.text = "%s wins the match with %d points!" % [PLAYER_NAMES[winner], total_score[winner]]
-		continue_button.text = "New Match"
+		status_label.text = "%s виграє матч з %d очками!" % [PLAYER_NAMES[winner], total_score[winner]]
+		continue_button.text = "Новий матч"
 	else:
-		status_label.text = "Round over"
-		continue_button.text = "Next Round"
+		status_label.text = "Раунд завершено"
+		continue_button.text = "Наступний раунд"
 	continue_button.visible = true
 
 func _on_continue_pressed() -> void:
@@ -480,7 +498,7 @@ func _on_continue_pressed() -> void:
 # ---------------------------------------------------------------------------
 
 func _render_status() -> void:
-	score_label.text = "You: %d   AI West: %d   AI East: %d" % [total_score[0], total_score[1], total_score[2]]
+	score_label.text = "Ви: %d   ІІ Захід: %d   ІІ Схід: %d" % [total_score[0], total_score[1], total_score[2]]
 	_render_ai_hands()
 
 ## Full rebuild of the player's hand row. Call only when the hand's card LIST
@@ -528,8 +546,8 @@ func _render_ai_hands() -> void:
 		cv.setup(null, false)  # face-down
 		cv.animate_in(i * 0.03)
 
-	ai_west_label.text = "AI West — %d cards" % hands[1].size()
-	ai_east_label.text = "AI East — %d cards" % hands[2].size()
+	ai_west_label.text = "ІІ Захід — %d карт" % hands[1].size()
+	ai_east_label.text = "ІІ Схід — %d карт" % hands[2].size()
 
 ## Lightweight refresh: only toggles which cards are clickable, no rebuild/animation.
 func _update_hand_interactivity() -> void:
@@ -593,8 +611,8 @@ func _marriage_value(suit: int) -> int:
 
 func _suit_name(suit: int) -> String:
 	match suit:
-		Card.Suit.HEARTS: return "Hearts"
-		Card.Suit.DIAMONDS: return "Diamonds"
-		Card.Suit.CLUBS: return "Clubs"
-		Card.Suit.SPADES: return "Spades"
+		Card.Suit.HEARTS: return "червах"
+		Card.Suit.DIAMONDS: return "бубнах"
+		Card.Suit.CLUBS: return "хрестах"
+		Card.Suit.SPADES: return "піках"
 	return "?"

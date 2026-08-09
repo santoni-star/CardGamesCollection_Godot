@@ -32,12 +32,12 @@ theme_override_constants/separation = 24
 
 [node name="BackButton" type="Button" parent="TopBar"]
 layout_mode = 2
-text = "< Menu"
+text = "< Меню"
 
 [node name="ScoreLabel" type="Label" parent="TopBar"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 18
-text = "You: 0   AI West: 0   AI East: 0"
+text = "Ви: 0   ІІ Захід: 0   ІІ Схід: 0"
 
 [node name="StatusLabel" type="Label" parent="TopBar"]
 layout_mode = 2
@@ -77,7 +77,7 @@ offset_top = 165.0
 offset_right = 220.0
 offset_bottom = 189.0
 theme_override_font_sizes/font_size = 16
-text = "AI West — 7 cards"
+text = "ІІ Захід — 7 карт"
 
 [node name="AIEastLabel" type="Label" parent="."]
 layout_mode = 1
@@ -91,7 +91,7 @@ offset_bottom = 189.0
 grow_horizontal = 0
 horizontal_alignment = 2
 theme_override_font_sizes/font_size = 16
-text = "AI East — 7 cards"
+text = "ІІ Схід — 7 карт"
 
 [node name="TrickArea" type="CenterContainer" parent="."]
 layout_mode = 1
@@ -114,7 +114,7 @@ theme_override_constants/separation = 4
 [node name="NameLabel" type="Label" parent="TrickArea/HBox/SlotAIWest"]
 layout_mode = 2
 horizontal_alignment = 1
-text = "AI West"
+text = "ІІ Захід"
 
 [node name="CardHolder" type="Control" parent="TrickArea/HBox/SlotAIWest"]
 custom_minimum_size = Vector2(80, 120)
@@ -127,7 +127,7 @@ theme_override_constants/separation = 4
 [node name="NameLabel" type="Label" parent="TrickArea/HBox/SlotYou"]
 layout_mode = 2
 horizontal_alignment = 1
-text = "You"
+text = "Ви"
 
 [node name="CardHolder" type="Control" parent="TrickArea/HBox/SlotYou"]
 custom_minimum_size = Vector2(80, 120)
@@ -140,7 +140,7 @@ theme_override_constants/separation = 4
 [node name="NameLabel" type="Label" parent="TrickArea/HBox/SlotAIEast"]
 layout_mode = 2
 horizontal_alignment = 1
-text = "AI East"
+text = "ІІ Схід"
 
 [node name="CardHolder" type="Control" parent="TrickArea/HBox/SlotAIEast"]
 custom_minimum_size = Vector2(80, 120)
@@ -177,7 +177,7 @@ theme_override_constants/separation = 8
 [node name="CurrentBidLabel" type="Label" parent="BiddingPanel"]
 layout_mode = 2
 horizontal_alignment = 1
-text = "Current bid: 0"
+text = "Поточна ставка: 0"
 
 [node name="HBoxContainer" type="HBoxContainer" parent="BiddingPanel"]
 layout_mode = 2
@@ -186,15 +186,15 @@ alignment = 1
 
 [node name="BidSmallButton" type="Button" parent="BiddingPanel/HBoxContainer"]
 layout_mode = 2
-text = "Bid +5"
+text = "Ставка +5"
 
 [node name="BidBigButton" type="Button" parent="BiddingPanel/HBoxContainer"]
 layout_mode = 2
-text = "Bid +25"
+text = "Ставка +25"
 
 [node name="PassButton" type="Button" parent="BiddingPanel/HBoxContainer"]
 layout_mode = 2
-text = "Pass"
+text = "Пас"
 
 [node name="DiscardPanel" type="VBoxContainer" parent="."]
 visible = false
@@ -211,12 +211,12 @@ theme_override_constants/separation = 8
 [node name="InstructionLabel" type="Label" parent="DiscardPanel"]
 layout_mode = 2
 horizontal_alignment = 1
-text = "Choose 3 cards to discard"
+text = "Виберіть 3 карти для скидання"
 
 [node name="ConfirmDiscardButton" type="Button" parent="DiscardPanel"]
 layout_mode = 2
 disabled = true
-text = "Confirm Discard"
+text = "Підтвердити скидання"
 
 [node name="ContinueButton" type="Button" parent="."]
 visible = false
@@ -229,7 +229,7 @@ anchor_bottom = 0.74
 grow_horizontal = 2
 grow_vertical = 2
 custom_minimum_size = Vector2(220, 50)
-text = "Next Round"
+text = "Наступний раунд"
 
 [node name="PlayerHandRow" type="HBoxContainer" parent="."]
 layout_mode = 1

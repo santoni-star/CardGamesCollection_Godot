@@ -30,12 +30,12 @@ theme_override_constants/separation = 30
 
 [node name="BackButton" type="Button" parent="TopBar"]
 layout_mode = 2
-text = "< Menu"
+text = "< Меню"
 
 [node name="ChipsLabel" type="Label" parent="TopBar"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 22
-text = "Chips: 1000"
+text = "Фішки: 1000"
 
 [node name="MessageLabel" type="Label" parent="TopBar"]
 layout_mode = 2
@@ -59,7 +59,7 @@ theme_override_constants/separation = 10
 layout_mode = 2
 theme_override_font_sizes/font_size = 20
 horizontal_alignment = 1
-text = "Dealer: 0"
+text = "Дилер: 0"
 
 [node name="DealerCards" type="HBoxContainer" parent="DealerSection"]
 layout_mode = 2
@@ -81,7 +81,7 @@ theme_override_constants/separation = 10
 layout_mode = 2
 theme_override_font_sizes/font_size = 20
 horizontal_alignment = 1
-text = "You: 0"
+text = "Ви: 0"
 
 [node name="PlayerCards" type="HBoxContainer" parent="PlayerSection"]
 layout_mode = 2
@@ -108,7 +108,7 @@ alignment = 1
 
 [node name="BetLabel" type="Label" parent="BottomBar/BetRow"]
 layout_mode = 2
-text = "Bet:"
+text = "Ставка:"
 
 [node name="BetSpinBox" type="SpinBox" parent="BottomBar/BetRow"]
 layout_mode = 2
@@ -119,7 +119,7 @@ value = 50.0
 
 [node name="DealButton" type="Button" parent="BottomBar/BetRow"]
 layout_mode = 2
-text = "Deal"
+text = "Роздати"
 
 [node name="ActionRow" type="HBoxContainer" parent="BottomBar"]
 layout_mode = 2
@@ -129,14 +129,14 @@ alignment = 1
 [node name="HitButton" type="Button" parent="BottomBar/ActionRow"]
 layout_mode = 2
 disabled = true
-text = "Hit"
+text = "Ще"
 
 [node name="StandButton" type="Button" parent="BottomBar/ActionRow"]
 layout_mode = 2
 disabled = true
-text = "Stand"
+text = "Досить"
 
 [node name="DoubleButton" type="Button" parent="BottomBar/ActionRow"]
 layout_mode = 2
 disabled = true
-text = "Double"
+text = "Подвоїти"
