@@ -48,6 +48,12 @@ text = "Chips: 1000"
 custom_minimum_size = Vector2(0, 10)
 layout_mode = 2
 
+[node name="KosynkaButton" type="Button" parent="CenterContainer/VBoxContainer"]
+layout_mode = 2
+custom_minimum_size = Vector2(320, 60)
+theme_override_font_sizes/font_size = 20
+text = "Косинка (Пасьянс)"
+
 [node name="BlackjackButton" type="Button" parent="CenterContainer/VBoxContainer"]
 layout_mode = 2
 custom_minimum_size = Vector2(320, 60)
