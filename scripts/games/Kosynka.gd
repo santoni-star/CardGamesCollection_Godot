@@ -558,6 +558,10 @@ func _draw_from_stock() -> void:
 			recycled.append(waste[i])
 		stock = recycled
 		waste.clear()
+		# Immediately draw one card after recycle.
+		waste.append(stock.pop_back())
+		moves += 1
+		moves_label.text = "Ходи: %d" % moves
 		_render_all()
 		return
 	waste.append(stock.pop_back())

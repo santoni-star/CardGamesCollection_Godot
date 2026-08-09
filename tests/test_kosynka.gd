@@ -100,9 +100,9 @@ func _init() -> void:
 	# --- recycle waste when stock empty ---
 	while not k.stock.is_empty():
 		k._draw_from_stock()
-	k._draw_from_stock()  # recycle
-	check(k.waste.is_empty(), "waste recycled into stock")
-	check(k.stock.size() > 0, "stock refilled after recycle")
+	k._draw_from_stock()  # recycle + draw one
+	check(k.waste.size() == 1, "after recycle waste has 1 card, got %d" % k.waste.size())
+	check(k.stock.size() > 0, "stock refilled after recycle (size %d)" % k.stock.size())
 
 	# --- win detection on fake complete foundations ---
 	for f in 4:
