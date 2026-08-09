@@ -42,6 +42,7 @@ var game_over: bool = false
 var _press_src: Dictionary = {}    # {"type": "waste"|"tableau", "col": int, "idx": int}
 var _press_pos: Vector2 = Vector2.ZERO
 var _drag_active: bool = false
+var _drag_dy: float = 0.0           # cursor offset from pile top, fixed at drag start
 var _ghosts: Array = []            # Array[Control] - flying card copies
 
 # --- Styleboxes -------------------------------------------------------------
@@ -400,16 +401,18 @@ func _start_drag(pos: Vector2) -> void:
 	var cards: Array = _dragged_cards_from(_press_src)
 	if cards.is_empty():
 		return
-	# Anchor: top of the pile under the cursor.
+	# Anchor: top of the pile under the cursor. dy is fixed for the whole drag
+	# so the grabbed card stays under the cursor while the run fans below it.
+	# It is measured from the PRESS position, not the current motion position.
 	var anchor_y: float
 	if _press_src.get("type", "") == "waste":
 		anchor_y = WASTE_POS.y
 	else:
 		anchor_y = _card_rect(_press_src.get("col", 0), _press_src.get("idx", 0)).position.y
-	var dy: float = pos.y - anchor_y
+	_drag_dy = _press_pos.y - anchor_y
 	for i in cards.size():
 		var cv := _make_card_btn(cards[i], true)
-		var y: float = pos.y + i * TAB_UP_STEP - dy
+		var y: float = pos.y - _drag_dy + i * TAB_UP_STEP
 		cv.position = Vector2(pos.x - CARD_SIZE.x * 0.5, y)
 		cv.z_index = 100 + i
 		board.add_child(cv)
@@ -418,16 +421,8 @@ func _start_drag(pos: Vector2) -> void:
 func _move_ghosts(pos: Vector2) -> void:
 	if _ghosts.is_empty():
 		return
-	var src_col: int = _press_src.get("col", -1)
-	var src_idx: int = _press_src.get("idx", -1)
-	var anchor_y: float
-	if _press_src.get("type", "") == "waste":
-		anchor_y = WASTE_POS.y
-	else:
-		anchor_y = _card_rect(src_col, src_idx).position.y
-	var dy: float = pos.y - anchor_y
 	for i in _ghosts.size():
-		_ghosts[i].position = Vector2(pos.x - CARD_SIZE.x * 0.5, pos.y + i * TAB_UP_STEP - dy)
+		_ghosts[i].position = Vector2(pos.x - CARD_SIZE.x * 0.5, pos.y - _drag_dy + i * TAB_UP_STEP)
 
 func _clear_ghosts() -> void:
 	for g in _ghosts:
