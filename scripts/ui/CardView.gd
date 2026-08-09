@@ -11,6 +11,12 @@ const Card = preload("res://scripts/card/Card.gd")
 var card: Card
 var face_up: bool = true
 
+func _ready() -> void:
+	# Inner nodes must never swallow mouse events — the root Panel (or the
+	# parent game board) owns input handling.
+	for child in get_children():
+		child.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
 func setup(p_card: Card, p_face_up: bool = true) -> void:
 	card = p_card
 	face_up = p_face_up

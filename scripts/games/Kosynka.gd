@@ -46,15 +46,25 @@ var foundation_views: Array = [[], [], [], []]
 var tableau_slots: Array[Panel] = []
 var tableau_views: Array = [[], [], [], [], [], [], []]
 
-var selected_col: int = -1
-var selected_idx: int = -1
 var moves: int = 0
 var elapsed: float = 0.0
 var game_over: bool = false
 
+# Drag & drop state.
+var _drag_active: bool = false
+var _drag_src: String = ""          # "waste" | "tableau"
+var _drag_col: int = -1
+var _drag_idx: int = -1
+var _drag_offset: Vector2 = Vector2.ZERO   # cursor pos inside the grabbed card
+var _drag_moved: bool = false
+var _ghost_views: Array[Control] = []
+const DRAG_THRESHOLD := 8.0
+
 func _ready() -> void:
 	back_button.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/MainMenu.tscn"))
 	new_game_button.pressed.connect(_on_new_game)
+	board.mouse_filter = Control.MOUSE_FILTER_STOP
+	board.gui_input.connect(_on_board_input)
 	_build_slots()
 	new_game()
 
@@ -69,19 +79,16 @@ func _process(delta: float) -> void:
 
 func _build_slots() -> void:
 	stock_slot = _make_slot(STOCK_POS)
-	stock_slot.gui_input.connect(_on_stock_slot_input)
 	board.add_child(stock_slot)
 
 	for i in 4:
 		var s := _make_slot(Vector2(FOUND_X[i], FOUND_Y))
 		foundation_slots.append(s)
-		s.gui_input.connect(_on_foundation_slot_input.bind(i))
 		board.add_child(s)
 
 	for i in 7:
 		var s := _make_slot(Vector2(TAB_X[i], TAB_Y))
 		tableau_slots.append(s)
-		s.gui_input.connect(_on_tableau_slot_input.bind(i))
 		board.add_child(s)
 
 func _make_slot(pos: Vector2) -> Panel:
@@ -89,7 +96,7 @@ func _make_slot(pos: Vector2) -> Panel:
 	p.custom_minimum_size = CARD_SIZE
 	p.position = pos
 	p.size = CARD_SIZE
-	p.mouse_filter = Control.MOUSE_FILTER_PASS
+	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = Color(1, 1, 1, 0.05)
 	sb.border_width_left = 1
@@ -128,8 +135,6 @@ func new_game() -> void:
 		stock.append(deck.draw_card())
 
 	_ensure_reveal_state()
-	selected_col = -1
-	selected_idx = -1
 	moves = 0
 	elapsed = 0.0
 	game_over = false
@@ -160,21 +165,19 @@ func _clear_views() -> void:
 
 func _render_all(animate_deal: bool = false) -> void:
 	_clear_views()
+	_clear_ghosts()
 
 	# Stock: face-down stack with a card view; empty => show slot only.
 	if not stock.is_empty():
 		stock_view = _make_card_view(null, false)
 		stock_view.position = STOCK_POS
-		stock_view.gui_input.connect(_on_stock_view_input)
 
-	# Waste: last up to 3 cards fanned right; only the top card is clickable.
+	# Waste: last up to 3 cards fanned right; only the top card is draggable.
 	var n := waste.size()
 	for i in n:
 		var cv: Control = _make_card_view(waste[i], true)
 		cv.position = WASTE_POS + Vector2(min((n - 1 - i) * 18, 36), 0)
 		waste_views.append(cv)
-		if i == n - 1:
-			cv.gui_input.connect(_on_waste_view_input)
 
 	# Foundations.
 	for f in 4:
@@ -183,7 +186,6 @@ func _render_all(animate_deal: bool = false) -> void:
 			var cv: Control = _make_card_view(foundations[f][count - 1], true)
 			cv.position = Vector2(FOUND_X[f], FOUND_Y)
 			foundation_views[f].append(cv)
-			cv.gui_input.connect(_on_foundation_card_input.bind(f))
 
 	# Tableau: stacked cards, face-down compressed, face-up spread.
 	for col in 7:
@@ -198,12 +200,10 @@ func _render_all(animate_deal: bool = false) -> void:
 			cv.position = Vector2(TAB_X[col], y)
 			tableau_views[col].append(cv)
 			if face_up:
-				cv.gui_input.connect(_on_tableau_card_input.bind(col, i))
 				y += TAB_UP_STEP
 			else:
 				y += TAB_DOWN_STEP
 
-	_refresh_selection_highlight()
 	_check_win()
 
 func _is_face_up(col: int, idx: int) -> bool:
@@ -229,22 +229,49 @@ func _ensure_reveal_state() -> void:
 
 func _make_card_view(card: Card, face_up: bool) -> Control:
 	var cv = CardViewScene.instantiate()
+	cv.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	board.add_child(cv)  # must be in tree before setup(): CardView uses @onready
 	cv.setup(card, face_up)
 	return cv
 
 # ---------------------------------------------------------------------------
-# INPUT
+# INPUT (drag & drop, hit-testing on the board)
 # ---------------------------------------------------------------------------
 
-func _on_stock_slot_input(event: InputEvent) -> void:
-	print(\"Stock slot clicked\")
-	if _is_left_click(event):
-		_draw_from_stock()
+func _on_board_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		if event.pressed:
+			_on_left_press(event.position)
+		else:
+			_on_left_release(event.position)
+	elif event is InputEventMouseMotion and _drag_active:
+		# Only count as a real drag once the cursor leaves the grab area.
+		if (event.position - (_drag_anchor() + _drag_offset)).length() > DRAG_THRESHOLD:
+			_drag_moved = true
+			_update_drag(event.position)
 
-func _on_stock_view_input(event: InputEvent) -> void:
-	if _is_left_click(event):
+func _on_left_press(pos: Vector2) -> void:
+	if game_over:
+		return
+	# Stock: draw a card (either on the stock slot or its card view).
+	if _rect_at(STOCK_POS).has_point(pos):
 		_draw_from_stock()
+		return
+	# Waste top card: start a drag.
+	if not waste.is_empty() and _rect_at(WASTE_POS + Vector2(min((waste.size() - 1) * 18, 36), 0)).has_point(pos):
+		_start_drag("waste", -1, -1, pos)
+		return
+	# Tableau face-up card: start a drag of the run from that card.
+	for col in 7:
+		var views: Array = tableau_views[col]
+		for i in range(views.size() - 1, -1, -1):
+			if not _is_face_up(col, i):
+				continue
+			if _card_rect(col, i).has_point(pos):
+				_start_drag("tableau", col, i, pos)
+				return
+	# Foundation top card: single click does nothing; use drag to place.
+	return
 
 func _draw_from_stock() -> void:
 	if game_over:
@@ -252,7 +279,7 @@ func _draw_from_stock() -> void:
 	if stock.is_empty():
 		if waste.is_empty():
 			return
-		# Recycle: waste becomes the stock again; top card (last drawn) draws first.
+		# Recycle: waste becomes the stock again; top card draws first.
 		stock = waste.duplicate()
 		waste.clear()
 		moves += 1
@@ -265,81 +292,166 @@ func _draw_from_stock() -> void:
 	_update_hud()
 	_render_all()
 
-func _on_waste_view_input(event: InputEvent) -> void:
-	if game_over or waste.is_empty():
+func _on_left_release(pos: Vector2) -> void:
+	if not _drag_active:
 		return
-	if _is_left_click(event):
-		var card: Card = waste[waste.size() - 1]
-		if not _try_auto_to_foundation(card, "waste", -1, waste.size() - 1):
-			# Selecting from waste: treat as a single-card selection.
-			_select_run(-1, -1)  # clear previous
-			selected_col = -2  # marker: waste
-			selected_idx = waste.size() - 1
-			_refresh_selection_highlight()
-
-func _on_foundation_card_input(event: InputEvent, f: int) -> void:
-	if _is_left_click(event):
-		_try_place_selected_on_foundation(f)
-
-func _on_foundation_slot_input(event: InputEvent, f: int) -> void:
-	if _is_left_click(event):
-		_try_place_selected_on_foundation(f)
-
-func _on_tableau_card_input(event: InputEvent, col: int, idx: int) -> void:
-	if game_over:
+	# A plain click (no drag) on a top card auto-sends it to a foundation.
+	if not _drag_moved:
+		_try_click_to_foundation()
+		_cancel_drag()
 		return
-	if not _is_left_click(event):
-		return
-	# Clicking a card inside the selected run cancels the selection (single click).
-	if selected_col == col and idx >= selected_idx and not event.double_click:
-		_selection_clear()
-		_refresh_selection_highlight()
-		return
-	if selected_col != -1:
-		# Try to drop a selected run onto this column.
-		if _try_place_selected_on_tableau(col):
+	# Decide the drop target from the release position.
+	for f in 4:
+		if _rect_at(Vector2(FOUND_X[f], FOUND_Y)).has_point(pos):
+			_finish_drag_to_foundation(f)
 			return
-		# If the clicked card itself can't accept, (re)select a run from it.
-	if _is_face_up(col, idx):
-		var card: Card = tableau[col][idx]
-		if idx == tableau[col].size() - 1:
-			if event.double_click:
-				if _try_auto_to_foundation(card, "tableau", col, idx):
-					return
-			if _try_auto_to_foundation(card, "tableau", col, idx):
-				return
-		_select_run(col, idx)
-		_refresh_selection_highlight()
+	for col in 7:
+		if _column_rect(col).has_point(pos):
+			_finish_drag_to_tableau(col)
+			return
+	_cancel_drag()
 
-func _on_tableau_slot_input(event: InputEvent, col: int) -> void:
-	if _is_left_click(event) and selected_col != -1:
-		_try_place_selected_on_tableau(col)
+func _try_click_to_foundation() -> void:
+	var cards: Array = _selected_cards()
+	if cards.size() != 1:
+		return
+	for f in 4:
+		if _can_place_foundation(f, cards[0]):
+			_execute_move_to_foundation(f)
+			return
 
-# ---------------------------------------------------------------------------
-# SELECTION
-# ---------------------------------------------------------------------------
+func _start_drag(src: String, col: int, idx: int, pos: Vector2) -> void:
+	_drag_active = true
+	_drag_src = src
+	_drag_col = col
+	_drag_idx = idx
+	_drag_moved = false
+	var anchor: Vector2
+	if src == "waste":
+		anchor = _rect_at(WASTE_POS + Vector2(min((waste.size() - 1) * 18, 36), 0)).position
+	else:
+		anchor = _card_rect(col, idx).position
+	_drag_offset = pos - anchor
+	_build_ghosts()
 
-func _select_run(col: int, idx: int) -> void:
-	selected_col = col
-	selected_idx = idx
+func _build_ghosts() -> void:
+	_clear_ghosts()
+	var cards: Array = _selected_cards()
+	for i in cards.size():
+		var cv: Control = _make_card_view(cards[i], true)
+		cv.z_index = 100
+		cv.position = _drag_anchor() + Vector2(0, i * TAB_UP_STEP)
+		_ghost_views.append(cv)
+
+func _update_drag(pos: Vector2) -> void:
+	var base: Vector2 = pos - _drag_offset
+	for i in _ghost_views.size():
+		_ghost_views[i].position = base + Vector2(0, i * TAB_UP_STEP)
+
+func _finish_drag_to_foundation(f: int) -> void:
+	var cards: Array = _selected_cards()
+	_clear_ghosts()
+	_drag_active = false
+	if cards.size() != 1:
+		return
+	if not _can_place_foundation(f, cards[0]):
+		return
+	_execute_move_to_foundation(f)
+
+func _finish_drag_to_tableau(col: int) -> void:
+	var cards: Array = _selected_cards()
+	_clear_ghosts()
+	_drag_active = false
+	if cards.is_empty():
+		return
+	# Don't drop a run onto its own column.
+	if _drag_src == "tableau" and _drag_col == col:
+		return
+	if not _can_place_tableau(col, cards[0]):
+		return
+	_execute_move_to_tableau(col)
+
+func _cancel_drag() -> void:
+	_clear_ghosts()
+	_drag_active = false
+	_drag_moved = false
+
+func _execute_move_to_foundation(f: int) -> void:
+	var src := _drag_src
+	var col := _drag_col
+	var idx := _drag_idx
+	var card: Card
+	if src == "waste":
+		card = waste.pop_back()
+	else:
+		card = tableau[col][idx]
+		tableau[col].remove_at(idx)
+		_auto_flip(col)
+	foundations[f].append(card)
+	moves += 1
+	_update_hud()
+	_render_all()
+	_check_win()
+
+func _execute_move_to_tableau(col: int) -> void:
+	var src := _drag_src
+	var from_idx := _drag_idx
+	if src == "waste":
+		var card: Card = waste.pop_back()
+		tableau[col].append(card)
+		_tableau_face_up[col][tableau[col].size() - 1] = true
+	else:
+		var src_col := _drag_col
+		var run: Array = tableau[src_col].slice(from_idx)
+		tableau[src_col].resize(from_idx)
+		tableau[col].append_array(run)
+		for k in run.size():
+			_tableau_face_up[col][tableau[col].size() - run.size() + k] = true
+		_auto_flip(src_col)
+	moves += 1
+	_update_hud()
+	_render_all()
 
 func _selected_cards() -> Array:
-	if selected_col == -2:  # waste
+	if _drag_src == "waste":
 		if waste.is_empty():
 			return []
 		return [waste[waste.size() - 1]]
-	if selected_col < 0:
-		return []
-	return tableau[selected_col].slice(selected_idx)
+	if _drag_src == "tableau" and _drag_col >= 0:
+		return tableau[_drag_col].slice(_drag_idx)
+	return []
 
-func _refresh_selection_highlight() -> void:
-	for col in 7:
-		for i in tableau_views[col].size():
-			var cv: Control = tableau_views[col][i]
-			var is_sel: bool = selected_col == col and i >= selected_idx
-			cv.modulate = Color(1, 1, 0.75) if is_sel else Color(1, 1, 1)
-	if selected_col == -2 and not waste_views.is_empty():
-		waste_views[waste_views.size() - 1].modulate = Color(1, 1, 0.75)
+func _drag_anchor() -> Vector2:
+	if _drag_src == "waste":
+		return _rect_at(WASTE_POS + Vector2(min((waste.size() - 1) * 18, 36), 0)).position
+	return _card_rect(_drag_col, _drag_idx).position
+
+func _clear_ghosts() -> void:
+	for g in _ghost_views:
+		if is_instance_valid(g):
+			g.queue_free()
+	_ghost_views.clear()
+
+func _rect_at(pos: Vector2) -> Rect2:
+	return Rect2(pos, CARD_SIZE)
+
+func _card_rect(col: int, idx: int) -> Rect2:
+	var y := TAB_Y
+	for i in idx:
+		y += TAB_UP_STEP if _is_face_up(col, i) else TAB_DOWN_STEP
+	return Rect2(Vector2(TAB_X[col], y), CARD_SIZE)
+
+func _column_rect(col: int) -> Rect2:
+	# Whole column footprint: from the top slot down past the last card,
+	# plus generous drop padding so releases slightly below the stack land.
+	var cards: Array = tableau[col]
+	var height: float = CARD_SIZE.y + 40.0
+	if not cards.is_empty():
+		var y := TAB_Y
+		for i in cards.size():
+			y += TAB_UP_STEP if _is_face_up(col, i) else TAB_DOWN_STEP
+		height = maxf(height, y - TAB_Y + CARD_SIZE.y * 0.5 + 40.0)
+	return Rect2(Vector2(TAB_X[col], TAB_Y), Vector2(CARD_SIZE.x, height))
 
 # ---------------------------------------------------------------------------
 # RULES
@@ -365,88 +477,10 @@ func _opposite_color(a: Card, b: Card) -> bool:
 func _is_red(c: Card) -> bool:
 	return c.suit == Card.Suit.HEARTS or c.suit == Card.Suit.DIAMONDS
 
-func _try_auto_to_foundation(card: Card, src_zone: String, col: int, idx: int) -> bool:
-	# Only the top card of a tableau column can go to a foundation.
-	if src_zone == "tableau" and idx != tableau[col].size() - 1:
-		return false
-	for f in 4:
-		if _can_place_foundation(f, card):
-			_move_to_foundation(src_zone, col, idx, f)
-			return true
-	return false
-
-func _move_to_foundation(src_zone: String, col: int, idx: int, f: int) -> void:
-	var card: Card
-	if src_zone == "waste":
-		card = waste.pop_back()
-	else:
-		card = tableau[col][idx]
-		tableau[col].remove_at(idx)
-		_auto_flip(col)
-	foundations[f].append(card)
-	moves += 1
-	_update_hud()
-	_render_all()
-	_check_win()
-
-func _try_place_selected_on_tableau(col: int) -> bool:
-	var cards: Array = _selected_cards()
-	if cards.is_empty():
-		return false
-	var target_col := col
-	if selected_col == -2:
-		if not _can_place_tableau(target_col, cards[0]):
-			return false
-		var card: Card = waste.pop_back()
-		tableau[target_col].append(card)
-		_tableau_face_up[target_col][tableau[target_col].size() - 1] = true
-	else:
-		var src := selected_col
-		var from_idx := selected_idx
-		if src == target_col:
-			_selection_clear()
-			return false
-		if not _can_place_tableau(target_col, cards[0]):
-			return false
-		var run: Array = tableau[src].slice(from_idx)
-		tableau[src].resize(from_idx)
-		tableau[target_col].append_array(run)
-		# All moved cards stay face-up in the target column.
-		for k in run.size():
-			_tableau_face_up[target_col][tableau[target_col].size() - run.size() + k] = true
-		_auto_flip(src)
-	moves += 1
-	_selection_clear()
-	_update_hud()
-	_render_all()
-	return true
-
-func _try_place_selected_on_foundation(f: int) -> void:
-	var cards: Array = _selected_cards()
-	if cards.is_empty() or cards.size() > 1:
-		return
-	if not _can_place_foundation(f, cards[0]):
-		return
-	if selected_col == -2:
-		waste.pop_back()
-	else:
-		tableau[selected_col].remove_at(selected_idx)
-		_auto_flip(selected_col)
-	foundations[f].append(cards[0])
-	moves += 1
-	_selection_clear()
-	_update_hud()
-	_render_all()
-	_check_win()
-
 func _auto_flip(col: int) -> void:
 	# After removing a card, the new top of a non-empty column becomes face-up.
 	if not tableau[col].is_empty():
 		_tableau_face_up[col][tableau[col].size() - 1] = true
-
-func _selection_clear() -> void:
-	selected_col = -1
-	selected_idx = -1
 
 # ---------------------------------------------------------------------------
 # HUD / WIN
@@ -468,6 +502,3 @@ func _check_win() -> void:
 	game_over = true
 	status_label.text = "Перемога! %s" % _format_time(elapsed)
 	CardFX.pulse(status_label)
-
-func _is_left_click(event: InputEvent) -> bool:
-	return event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed
