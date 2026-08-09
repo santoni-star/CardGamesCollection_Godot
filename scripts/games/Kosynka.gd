@@ -172,7 +172,9 @@ func _can_place_tableau(col: int, card: Card) -> bool:
 	if not _is_face_up(col, tableau[col].size() - 1):
 		return false
 	var diff_ok: bool = card.rank == top.rank - 1
-	var color_ok: bool = (card.suit % 2) != (top.suit % 2)
+	var card_red: bool = card.suit == Card.Suit.HEARTS or card.suit == Card.Suit.DIAMONDS
+	var top_red: bool = top.suit == Card.Suit.HEARTS or top.suit == Card.Suit.DIAMONDS
+	var color_ok: bool = card_red != top_red
 	return diff_ok and color_ok
 
 ## Cards picked up by the current drag (single waste card or a tableau run).
@@ -504,6 +506,9 @@ func _finish_drop_to_tableau(col: int, cards: Array, src: Dictionary) -> void:
 	for c in cards:
 		tableau[col].append(c)
 	_face_up[col][tableau[col].size() - 1] = true
+	# All moved cards were face-up in source; ensure they stay face-up.
+	for i in range(tableau[col].size() - cards.size(), tableau[col].size()):
+		_face_up[col][i] = true
 	_after_move()
 
 ## Removes the run starting at (col, idx); flips the new top card.
