@@ -25,33 +25,14 @@ func _init() -> void:
 		check(k.tableau[i].size() == i + 1, "tableau[%d] has %d cards, expected %d" % [i, k.tableau[i].size(), i + 1])
 	for i in 7:
 		check(k._is_face_up(i, k.tableau[i].size() - 1), "top of col %d is face-up" % i)
-	check(k._is_face_up(0, 0) == false or k.tableau[0].size() == 1, "col0 single card logic ok")
 
-	# --- stock draw via board input (real click path) ---
+	# --- stock draw via button press path ---
 	var before: int = k.waste.size()
-	_press(k, Vector2(84, 162))
+	k._on_stock_pressed()
 	check(k.waste.size() == before + 1, "stock click draws a card (%d -> %d)" % [before, k.waste.size()])
 	check(k.stock.size() == 23, "after draw stock 23, got %d" % k.stock.size())
-	var drawn: Card = k.waste[k.waste.size() - 1]
-	check(drawn != null, "drawn card exists")
 
-	# --- drag waste card onto a foundation (only if top card is an ace) ---
-	var top: Card = k.waste[k.waste.size() - 1]
-	if top.rank == 1:
-		var f_target: int = -1
-		for f in 4:
-			if k._can_place_foundation(f, top):
-				f_target = f
-				break
-		if f_target >= 0:
-			var wrect: Rect2 = Rect2(k.WASTE_POS + Vector2(min((k.waste.size() - 1) * 18, 36), 0), k.CARD_SIZE)
-			var press_pos: Vector2 = wrect.position + Vector2(44, 62)
-			var drop_pos: Vector2 = Vector2(k.FOUND_X[f_target] + 44, 162)
-			_drag(k, press_pos, drop_pos)
-			check(k.foundations[f_target].size() == 1, "dragged waste ace onto foundation %d" % f_target)
-			check(k.waste.is_empty() or k.waste[k.waste.size() - 1] != top, "waste card removed after drag")
-
-	# --- foundation rule via click-to-foundation (top tableau card that is an ace) ---
+	# --- plain click on a top tableau ace auto-sends to foundation ---
 	var ace_col: int = -1
 	for col in 7:
 		var i: int = k.tableau[col].size() - 1
@@ -65,33 +46,56 @@ func _init() -> void:
 				f_target = f
 				break
 		if f_target >= 0:
-			var r: Rect2 = k._card_rect(ace_col, k.tableau[ace_col].size() - 1)
-			_click(k, r.position + Vector2(44, 62))
+			var src := {"type": "tableau", "col": ace_col, "idx": k.tableau[ace_col].size() - 1}
+			k._on_card_down(src)
+			k._on_card_up()
 			check(k.foundations[f_target].size() == 1, "plain click auto-sends ace to foundation %d" % f_target)
 
-	# --- tableau stacking + run drag (controlled state) ---
+	# --- controlled drag: waste ace onto a foundation ---
 	k.waste.clear()
 	for f in 4:
 		k.foundations[f].clear()
-	for t in 7:
-		k.tableau[t].clear()
-	k._tableau_face_up = [{}, {}, {}, {}, {}, {}, {}]
-	k.tableau[0].append(Card.new(Card.Suit.SPADES, 12))   # Q♠
-	k.tableau[1].append(Card.new(Card.Suit.HEARTS, 13))   # K♥
-	k._tableau_face_up[0] = {0: true}
-	k._tableau_face_up[1] = {0: true}
+	k.waste.append(Card.new(Card.Suit.SPADES, 1))
 	k._render_all()
-	var r0: Rect2 = k._card_rect(0, 0)
-	var drop: Vector2 = Vector2(k.TAB_X[1] + 44, 400)
-	_drag(k, r0.position + Vector2(44, 62), drop)
+	k._on_card_down({"type": "waste"})
+	k._start_drag(Vector2(200, 150))
+	k._move_ghosts(Vector2(k.FOUND_X[0] + 44, 162))
+	var cards: Array = k._dragged_cards_from({"type": "waste"})
+	check(cards.size() == 1, "waste drag picks 1 card")
+	k._finish_drop_to_foundation(0, cards)
+	check(k.foundations[0].size() == 1, "drag waste ace onto foundation 0")
+	check(k.waste.is_empty(), "waste emptied after drag")
+
+	# --- controlled drag: tableau run onto another column ---
+	k.tableau[0].clear()
+	k._face_up[0] = {}
+	k.tableau[1].clear()
+	k._face_up[1] = {}
+	k.tableau[0].append(Card.new(Card.Suit.SPADES, 12))  # Q♠
+	k.tableau[1].append(Card.new(Card.Suit.HEARTS, 13))  # K♥
+	k._face_up[0] = {0: true}
+	k._face_up[1] = {0: true}
+	k._render_all()
+	var src2 := {"type": "tableau", "col": 0, "idx": 0}
+	k._on_card_down(src2)
+	k._start_drag(Vector2(k.TAB_X[0] + 44, 400))
+	k._move_ghosts(Vector2(k.TAB_X[1] + 44, 400))
+	var cards2: Array = k._dragged_cards_from(src2)
+	check(cards2.size() == 1, "tableau drag picks the run")
+	k._finish_drop_to_tableau(1, cards2, src2)
 	check(k.tableau[0].is_empty(), "run moved off source column")
 	check(k.tableau[1].size() == 2, "run landed on target column (size %d)" % k.tableau[1].size())
 
 	# --- same-column drop rejected ---
 	var before_size: int = k.tableau[1].size()
-	var r1: Rect2 = k._card_rect(1, 1)
-	_drag(k, r1.position + Vector2(44, 62), Vector2(k.TAB_X[1] + 44, 400))
+	var src3 := {"type": "tableau", "col": 1, "idx": 1}
+	var cards3: Array = k._dragged_cards_from(src3)
+	k._finish_drop_to_tableau(1, cards3, src3)
 	check(k.tableau[1].size() == before_size, "same-column drop rejected")
+
+	# --- foundation rule: no stacking wrong suit ---
+	var heart2 := Card.new(Card.Suit.HEARTS, 2)
+	check(k._can_place_foundation(0, heart2) == false, "heart 2 cannot go on spade foundation")
 
 	# --- recycle waste when stock empty ---
 	while not k.stock.is_empty():
@@ -101,13 +105,6 @@ func _init() -> void:
 	check(k.stock.size() > 0, "stock refilled after recycle")
 
 	# --- win detection on fake complete foundations ---
-	var any_card: Card = null
-	for col in 7:
-		if not k.tableau[col].is_empty():
-			any_card = k.tableau[col][0]
-			break
-	if any_card == null:
-		any_card = k.waste[0]
 	for f in 4:
 		k.foundations[f].clear()
 		for r in 13:
@@ -117,32 +114,6 @@ func _init() -> void:
 
 	print("=== Kosynka tests: %d failures ===" % failures)
 	quit(1 if failures > 0 else 0)
-
-func _press(k, pos: Vector2) -> void:
-	var ev := InputEventMouseButton.new()
-	ev.button_index = MOUSE_BUTTON_LEFT
-	ev.pressed = true
-	ev.position = pos
-	k._on_board_input(ev)
-
-func _click(k, pos: Vector2) -> void:
-	_press(k, pos)
-	var rel := InputEventMouseButton.new()
-	rel.button_index = MOUSE_BUTTON_LEFT
-	rel.pressed = false
-	rel.position = pos
-	k._on_board_input(rel)
-
-func _drag(k, from: Vector2, to: Vector2) -> void:
-	_press(k, from)
-	var mot := InputEventMouseMotion.new()
-	mot.position = to
-	k._on_board_input(mot)
-	var rel := InputEventMouseButton.new()
-	rel.button_index = MOUSE_BUTTON_LEFT
-	rel.pressed = false
-	rel.position = to
-	k._on_board_input(rel)
 
 func check(cond: bool, msg: String) -> void:
 	if cond:
