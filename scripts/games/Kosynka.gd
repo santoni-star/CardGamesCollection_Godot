@@ -63,10 +63,26 @@ const DRAG_THRESHOLD := 8.0
 func _ready() -> void:
 	back_button.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/MainMenu.tscn"))
 	new_game_button.pressed.connect(_on_new_game)
-	board.mouse_filter = Control.MOUSE_FILTER_STOP
-	board.gui_input.connect(_on_board_input)
+	# Bulletproof pass-through: every Control except Buttons becomes
+	# MOUSE_FILTER_IGNORE, so nothing can swallow board clicks. Buttons keep
+	# their default STOP and eat their own clicks in the GUI phase; all other
+	# clicks/motion reach _unhandled_input below (viewport coordinates).
+	_make_pass_through(self)
 	_build_slots()
 	new_game()
+
+func _make_pass_through(node: Node) -> void:
+	for child in node.get_children():
+		if child is Button:
+			continue  # buttons keep STOP: they consume their own clicks
+		if child is Control:
+			child.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_make_pass_through(child)
+
+## Board-level input. Buttons on the TopBar consume their clicks in the GUI
+## phase; all other clicks/motion land here as unhandled input.
+func _unhandled_input(event: InputEvent) -> void:
+	_on_board_input(event)
 
 func _process(delta: float) -> void:
 	if not game_over:
