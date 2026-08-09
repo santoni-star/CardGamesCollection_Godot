@@ -1,4 +1,7 @@
 extends Control
+const Deck = preload("res://scripts/card/Deck.gd")
+const CardFX = preload("res://scripts/core/CardFX.gd")
+const Card = preload("res://scripts/card/Card.gd")
 ## Blackjack module. All animation goes through CardFX (scripts/core/CardFX.gd) —
 ## this file only contains Blackjack's rules; the visual feel is shared with
 ## every other game in the collection.

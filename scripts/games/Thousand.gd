@@ -1,4 +1,7 @@
 extends Control
+const Deck = preload("res://scripts/card/Deck.gd")
+const CardFX = preload("res://scripts/core/CardFX.gd")
+const Card = preload("res://scripts/card/Card.gd")
 ## Thousand (1000) module. All animation goes through CardFX
 ## (scripts/core/CardFX.gd) — this file only contains Thousand's rules.
 ## Player 0 = You, 1 = AI West, 2 = AI East. 24-card deck, 7 cards each, 3-card widow.

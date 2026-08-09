@@ -1,4 +1,7 @@
 extends Control
+const Deck = preload("res://scripts/card/Deck.gd")
+const CardFX = preload("res://scripts/core/CardFX.gd")
+const Card = preload("res://scripts/card/Card.gd")
 ## Hearts module. All animation goes through CardFX (scripts/core/CardFX.gd) —
 ## this file only contains Hearts' rules. Player 0 = You, 1 = West, 2 = North, 3 = East.
 ## Standard 52-card deck, 13 cards each, no trump — the trick's led suit always decides.

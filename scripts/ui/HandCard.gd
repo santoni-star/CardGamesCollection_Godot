@@ -1,4 +1,6 @@
 extends Button
+const CardFX = preload("res://scripts/core/CardFX.gd")
+const Card = preload("res://scripts/card/Card.gd")
 ## A clickable card used in the player's hand row.
 ## Used both for playing a card (Playing phase) and selecting cards to discard (Discarding phase).
 

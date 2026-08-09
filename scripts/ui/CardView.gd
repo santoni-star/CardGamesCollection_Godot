@@ -1,4 +1,6 @@
 extends Panel
+const CardFX = preload("res://scripts/core/CardFX.gd")
+const Card = preload("res://scripts/card/Card.gd")
 ## Visual representation of a single Card. Works without external art assets.
 
 @onready var rank_top: Label = $RankLabelTop

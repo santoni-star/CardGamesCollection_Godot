@@ -1,5 +1,6 @@
 class_name Deck
 extends RefCounted
+const Card = preload("res://scripts/card/Card.gd")
 ## A shuffleable stack of Cards.
 
 var cards: Array[Card] = []
