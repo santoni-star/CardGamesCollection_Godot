@@ -44,6 +44,7 @@ var _press_pos: Vector2 = Vector2.ZERO
 var _drag_active: bool = false
 var _drag_dy: float = 0.0           # cursor offset from pile top, fixed at drag start
 var _ghosts: Array = []            # Array[Control] - flying card copies
+var _hidden_originals: Array = []  # original card buttons hidden during drag
 
 # --- Styleboxes -------------------------------------------------------------
 var _sb_card: StyleBoxFlat
@@ -401,6 +402,29 @@ func _start_drag(pos: Vector2) -> void:
 	var cards: Array = _dragged_cards_from(_press_src)
 	if cards.is_empty():
 		return
+	# Hide the original card buttons on the board.
+	_hidden_originals.clear()
+	var children: Array = board.get_children()
+	if _press_src.get("type", "") == "waste":
+		# Waste: find the last face-up button (top card).
+		for c in children:
+			if c is Button and c.mouse_filter != Control.MOUSE_FILTER_IGNORE and c.position.x >= WASTE_POS.x - 2 and c.position.x <= WASTE_POS.x + 2:
+				c.visible = false
+				_hidden_originals.append(c)
+	else:
+		# Tableau: find buttons matching the dragged run.
+		var col: int = _press_src.get("col", -1)
+		var idx: int = _press_src.get("idx", -1)
+		for c in children:
+			if c is Button and c.mouse_filter != Control.MOUSE_FILTER_IGNORE:
+				var rect: Rect2 = Rect2(c.position, CARD_SIZE)
+				var target_rect: Rect2 = _card_rect(col, idx)
+				if rect.has_point(target_rect.position):
+					c.visible = false
+					_hidden_originals.append(c)
+					idx += 1
+					if idx >= tableau[col].size():
+						break
 	# Anchor: top of the pile under the cursor. dy is fixed for the whole drag
 	# so the grabbed card stays under the cursor while the run fans below it.
 	# It is measured from the PRESS position, not the current motion position.
@@ -429,6 +453,11 @@ func _clear_ghosts() -> void:
 		if is_instance_valid(g):
 			g.queue_free()
 	_ghosts.clear()
+	# Restore hidden original cards.
+	for c in _hidden_originals:
+		if is_instance_valid(c):
+			c.visible = true
+	_hidden_originals.clear()
 
 func _try_click_to_foundation(src: Dictionary) -> void:
 	var cards: Array = _dragged_cards_from(src)
