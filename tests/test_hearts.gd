@@ -63,7 +63,7 @@ func _ready() -> void:
 		if h.round_points[p] == 26:
 			moon = true
 	check(moon or total_pts == 26, "trick points sum to 26 (%d, moon=%s)" % [total_pts, str(moon)])
-	check(h.trick_number == 13, "13 tricks played (%d)" % h.trick_number)
+	check(h.trick_number == 14, "14 tricks played (%d)" % h.trick_number)
 
 	print("=== Hearts tests: %d failures ===" % failures)
 	get_tree().quit(1 if failures > 0 else 0)

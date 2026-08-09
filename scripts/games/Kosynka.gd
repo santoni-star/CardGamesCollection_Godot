@@ -89,6 +89,7 @@ func _make_slot(pos: Vector2) -> Panel:
 	p.custom_minimum_size = CARD_SIZE
 	p.position = pos
 	p.size = CARD_SIZE
+	p.mouse_filter = Control.MOUSE_FILTER_PASS
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = Color(1, 1, 1, 0.05)
 	sb.border_width_left = 1
@@ -237,6 +238,7 @@ func _make_card_view(card: Card, face_up: bool) -> Control:
 # ---------------------------------------------------------------------------
 
 func _on_stock_slot_input(event: InputEvent) -> void:
+	print(\"Stock slot clicked\")
 	if _is_left_click(event):
 		_draw_from_stock()
 
