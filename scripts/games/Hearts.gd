@@ -14,28 +14,36 @@ enum Phase { PASSING, PLAYING, ROUND_OVER, GAME_OVER }
 const CardViewScene := preload("res://scenes/components/CardView.tscn")
 const HandCardScene := preload("res://scenes/components/HandCard.tscn")
 
-@onready var back_button: Button = $TopBar/BackButton
-@onready var score_label: Label = $TopBar/ScoreLabel
-@onready var status_label: Label = $TopBar/StatusLabel
+## AI hand cards: full-size face-down cards. West/East are turned 90° sideways
+## (124x88) as tall stacks on the sides; North stays upright/portrait as a
+## horizontal strip at the very top. Each next card overlaps so only a ~30px
+## strip shows (Microsoft Hearts look; reference: 27-35px shift).
+const AI_CARD_SIZE := Vector2(88, 124)
+const SIDE_CARD_SIZE := Vector2(124, 88)  # West/East cards rotated 90° sideways
+const AI_STRIP := 30.0  # visible strip of each fanned card
+
+@onready var back_button: Button = $BackButton
+@onready var score_label: Label = $ScoreLabel
+@onready var status_label: Label = $StatusLabel
 @onready var message_label: Label = $MessageLabel
+@onready var player_name_label: Label = $PlayerName
 
 @onready var slot_holder := {0: null, 1: null, 2: null, 3: null}
 
-@onready var west_hand: VBoxContainer = $WestHand
+@onready var west_hand: VBoxContainer = $WestSide/WestHand
 @onready var north_hand: HBoxContainer = $NorthHand
-@onready var east_hand: VBoxContainer = $EastHand
+@onready var east_hand: VBoxContainer = $EastSide/EastHand
 
-@onready var pass_panel: VBoxContainer = $PassPanel
-@onready var pass_instruction_label: Label = $PassPanel/InstructionLabel
-@onready var confirm_pass_button: Button = $PassPanel/ConfirmPassButton
+@onready var pass_arrow_button: Button = $PassArrowButton
 
 @onready var continue_button: Button = $ContinueButton
 @onready var player_hand_row: HBoxContainer = $PlayerHandRow
 
-const PLAYER_NAMES := ["You", "West", "North", "East"]
+var PLAYER_NAMES := ["Player", "West", "North", "East"]
 # Pass direction per round (round_number % 4): left, right, across, hold.
 const PASS_OFFSETS := [1, 3, 2, 0]
 const PASS_NAMES := ["left", "right", "across", "hold your cards"]
+const PASS_ARROWS := ["←", "→", "↑", ""]
 
 var hands: Array = [[], [], [], []]
 var total_score: Array = [0, 0, 0, 0]
@@ -53,13 +61,16 @@ var current_turn: int = 0
 var round_points: Array = [0, 0, 0, 0]
 
 func _ready() -> void:
+	PLAYER_NAMES[0] = GameData.player_name
+	player_name_label.text = GameData.player_name
+
 	slot_holder[0] = $TrickArea/SlotYou
 	slot_holder[1] = $TrickArea/SlotWest
 	slot_holder[2] = $TrickArea/SlotNorth
 	slot_holder[3] = $TrickArea/SlotEast
 
 	back_button.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/MainMenu.tscn"))
-	confirm_pass_button.pressed.connect(_on_confirm_pass)
+	pass_arrow_button.pressed.connect(_on_confirm_pass)
 	continue_button.pressed.connect(_on_continue_pressed)
 
 	start_new_round()
@@ -71,7 +82,7 @@ func _ready() -> void:
 func start_new_round() -> void:
 	message_label.text = ""
 	continue_button.visible = false
-	pass_panel.visible = false
+	pass_arrow_button.visible = false
 	_clear_trick_area()
 
 	var deck := Deck.new()
@@ -101,10 +112,10 @@ func start_new_round() -> void:
 	else:
 		phase = Phase.PASSING
 		selected_pass.clear()
-		pass_instruction_label.text = "Pass 3 cards %s" % PASS_NAMES[round_number % 4]
-		confirm_pass_button.disabled = true
-		pass_panel.visible = true
-		status_label.text = "Choose 3 cards to pass"
+		pass_arrow_button.text = PASS_ARROWS[round_number % 4]
+		pass_arrow_button.disabled = true
+		pass_arrow_button.visible = true
+		status_label.text = "Select 3 cards"
 		_render_hands(true)
 
 func _on_confirm_pass() -> void:
@@ -123,10 +134,11 @@ func _on_confirm_pass() -> void:
 	for p in 4:
 		hands[p].sort_custom(func(a, b): return _card_sort_key(a) < _card_sort_key(b))
 
-	pass_panel.visible = false
+	pass_arrow_button.visible = false
 	phase = Phase.PLAYING
 	message_label.text = "Cards passed %s." % PASS_NAMES[round_number % 4]
 	_render_hands(true)
+	_render_ai_hands()
 	_begin_first_trick()
 
 func _ai_choose_pass(p: int) -> Array:
@@ -171,6 +183,7 @@ func _try_play_human_card(card: Card, hand_card_node: Control) -> void:
 	_play_card(0, card)
 
 func _play_card(player: int, card: Card) -> void:
+	var idx: int = hands[player].find(card)
 	hands[player].erase(card)
 	if card.suit == Card.Suit.HEARTS:
 		hearts_broken = true
@@ -179,6 +192,19 @@ func _play_card(player: int, card: Card) -> void:
 	_place_trick_card_visual(player, card)
 	if player == 0:
 		_render_hands(false)
+	else:
+		# Remove the played card from the AI hand immediately so the hand
+		# count on screen stays in sync with the real hands.
+		var container: BoxContainer
+		match player:
+			1:
+				container = west_hand
+			2:
+				container = north_hand
+			3:
+				container = east_hand
+		if container != null and idx >= 0 and idx < container.get_child_count():
+			container.get_child(idx).queue_free()
 
 	var all_played := true
 	for c in trick_cards:
@@ -372,12 +398,15 @@ func _on_continue_pressed() -> void:
 # ---------------------------------------------------------------------------
 
 func _render_status() -> void:
-	score_label.text = "You: %d  West: %d  North: %d  East: %d" % total_score
+	score_label.text = "%s: %d   West: %d   North: %d   East: %d" % [PLAYER_NAMES[0], total_score[0], total_score[1], total_score[2], total_score[3]]
 	_render_ai_hands()
 
 func _render_hands(animate: bool) -> void:
 	for c in player_hand_row.get_children():
 		c.queue_free()
+
+	# Slight fan: each next card overlaps the previous by 13px (reference look)
+	player_hand_row.add_theme_constant_override("separation", -13)
 
 	var legal_now: Array = []
 	if phase == Phase.PLAYING and current_turn == 0:
@@ -396,35 +425,57 @@ func _render_hands(animate: bool) -> void:
 			hc.animate_in(i * 0.03)
 		i += 1
 
-	_render_ai_hands()
-
 func _render_ai_hands() -> void:
-	# Render West hand (face-down cards, vertical on left)
+	# AI hands are fanned strips: each next card overlaps the previous so only
+	# a ~30px strip of each card shows (Microsoft Hearts look). West/East cards
+	# are turned 90° sideways (124x88) in tall stacks; North stays upright as a
+	# horizontal strip at the very top.
+	# Separation = -(card size - visible strip):
+	#   side stacks (sideways card 88 tall):  -(88 - 30) = -58
+	#   north strip   (card 88 wide):         -(88 - 30) = -58
+	var sep_v := -int(SIDE_CARD_SIZE.y - AI_STRIP)
+	var sep_h := -int(AI_CARD_SIZE.x - AI_STRIP)
+
+	west_hand.add_theme_constant_override("separation", sep_v)
+	east_hand.add_theme_constant_override("separation", sep_v)
+	north_hand.add_theme_constant_override("separation", sep_h)
+
+	# Render West hand (vertical face-down stack of sideways cards, left)
 	for c in west_hand.get_children():
 		c.queue_free()
 	for i in range(hands[1].size()):
-		var cv = CardViewScene.instantiate()
+		var cv := _make_ai_card(true)
 		west_hand.add_child(cv)
-		cv.setup(null, false)  # face-down
+		cv.setup(null, false)  # face-down (after add_child so @onready is ready)
 		cv.animate_in(i * 0.03)
-	
-	# Render North hand (face-down cards, horizontal on top)
+
+	# Render North hand (horizontal face-down strip at the very top)
 	for c in north_hand.get_children():
 		c.queue_free()
 	for i in range(hands[2].size()):
-		var cv = CardViewScene.instantiate()
+		var cv := _make_ai_card()
 		north_hand.add_child(cv)
-		cv.setup(null, false)  # face-down
+		cv.setup(null, false)
 		cv.animate_in(i * 0.03)
-	
-	# Render East hand (face-down cards, vertical on right)
+
+	# Render East hand (vertical face-down stack of sideways cards, right)
 	for c in east_hand.get_children():
 		c.queue_free()
 	for i in range(hands[3].size()):
-		var cv = CardViewScene.instantiate()
+		var cv := _make_ai_card(true)
 		east_hand.add_child(cv)
-		cv.setup(null, false)  # face-down
+		cv.setup(null, false)
 		cv.animate_in(i * 0.03)
+
+## Full-size face-down CardView for an AI hand. Pass horizontal=true for the
+## West/East sideways (124x88) stacks. Caller must add_child() and call
+## setup() after (needs @onready nodes).
+func _make_ai_card(horizontal: bool = false) -> Control:
+	var cv := CardViewScene.instantiate()
+	cv.custom_minimum_size = SIDE_CARD_SIZE if horizontal else AI_CARD_SIZE
+	cv.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	cv.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	return cv
 
 func _update_hand_interactivity() -> void:
 	var legal_now: Array = []
@@ -449,7 +500,7 @@ func _toggle_pass_selection(hc) -> void:
 	elif selected_pass.size() < 3:
 		hc.selected = true
 		selected_pass.append(hc.card)
-	confirm_pass_button.disabled = selected_pass.size() != 3
+	pass_arrow_button.disabled = selected_pass.size() != 3
 
 func _place_trick_card_visual(player: int, card: Card) -> void:
 	var holder: Control = slot_holder[player]

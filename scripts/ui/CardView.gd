@@ -35,8 +35,8 @@ func _refresh() -> void:
 		rank_top.text = ""
 		suit_center.text = ""
 		rank_bottom.text = ""
-		back_pattern.visible = true
 		self_modulate = Color(1, 1, 1)
+		back_pattern.visible = true
 		return
 
 	back_pattern.visible = false
